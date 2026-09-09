@@ -428,7 +428,8 @@ const sincronizarConAppsScript = async () => {
   try {
     await fetch(telegramCfg.gasUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify({ corrales })
     });
   } catch (e) {
@@ -440,8 +441,24 @@ const cargarDesdeAppsScript = async (mostrarToast = false) => {
   if (!telegramCfg.gasUrl) return;
   if (mostrarToast) toast('☁️ Sincronizando con la nube...');
   try {
-    const res = await fetch(telegramCfg.gasUrl);
-    const data = await res.json();
+    const data = await new Promise((resolve, reject) => {
+      const cb = 'jpcb_' + Date.now();
+      const s = document.createElement('script');
+      const t = setTimeout(() => {
+        document.body.removeChild(s);
+        delete window[cb];
+        reject(new Error('timeout'));
+      }, 15000);
+      window[cb] = (d) => {
+        clearTimeout(t);
+        document.body.removeChild(s);
+        delete window[cb];
+        resolve(d);
+      };
+      const sep = telegramCfg.gasUrl.includes('?') ? '&' : '?';
+      s.src = telegramCfg.gasUrl + sep + 'callback=' + cb;
+      document.body.appendChild(s);
+    });
     if (data && data.ok && Array.isArray(data.corrales)) {
       if (data.corrales.length > 0) {
         corrales = data.corrales;
@@ -456,9 +473,11 @@ const cargarDesdeAppsScript = async (mostrarToast = false) => {
       } else if (mostrarToast) {
         toast('☁️ Sin datos en la nube ni local.');
       }
+    } else if (mostrarToast) {
+      toast('⚠️ Error al leer datos de la nube.');
     }
   } catch (e) {
-    if (mostrarToast) toast('⚠️ No se pudo conectar con la nube.');
+    if (mostrarToast) toast('⚠️ No se pudo conectar con la nube. Verificá que el script esté desplegado como "Cualquier persona, incluso anónimo".');
     console.warn('Error cargando desde Apps Script:', e);
   }
 };
@@ -1217,11 +1236,27 @@ const init = async () => {
   cargar();
   revisarCambios();
 
-  // Sincronizar con la nube al iniciar: descarga si hay datos, o sube los locales si está vacía
+  // Sincronizar con la nube al iniciar (JSONP para evitar CORS)
   if (telegramCfg.gasUrl) {
     try {
-      const res = await fetch(telegramCfg.gasUrl);
-      const data = await res.json();
+      const data = await new Promise((resolve, reject) => {
+        const cb = 'jpcb_' + Date.now();
+        const s = document.createElement('script');
+        const t = setTimeout(() => {
+          document.body.removeChild(s);
+          delete window[cb];
+          reject(new Error('timeout'));
+        }, 15000);
+        window[cb] = (d) => {
+          clearTimeout(t);
+          document.body.removeChild(s);
+          delete window[cb];
+          resolve(d);
+        };
+        const sep = telegramCfg.gasUrl.includes('?') ? '&' : '?';
+        s.src = telegramCfg.gasUrl + sep + 'callback=' + cb;
+        document.body.appendChild(s);
+      });
       if (data && data.ok && Array.isArray(data.corrales)) {
         if (data.corrales.length > 0) {
           corrales = data.corrales;
