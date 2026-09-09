@@ -424,11 +424,10 @@ return data.ok;
   };
 
 const sincronizarConAppsScript = async () => {
-  if (!telegramCfg.gasUrl) return;
+  if (!telegramCfg.gasUrl || corrales.length === 0) return;
   try {
     await fetch(telegramCfg.gasUrl, {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ corrales })
     });
@@ -443,14 +442,20 @@ const cargarDesdeAppsScript = async (mostrarToast = false) => {
   try {
     const res = await fetch(telegramCfg.gasUrl);
     const data = await res.json();
-    if (data && data.ok && Array.isArray(data.corrales) && data.corrales.length > 0) {
-      corrales = data.corrales;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(corrales));
-      revisarCambios();
-      render();
-      if (mostrarToast) toast(`✅ Sincronizado: ${corrales.length} corrales actualizados`);
-    } else if (mostrarToast) {
-      toast('☁️ La nube no tiene corrales registrados aún.');
+    if (data && data.ok && Array.isArray(data.corrales)) {
+      if (data.corrales.length > 0) {
+        corrales = data.corrales;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(corrales));
+        revisarCambios();
+        render();
+        if (mostrarToast) toast(`✅ Sincronizado: ${corrales.length} corrales`);
+      } else if (corrales.length > 0) {
+        if (mostrarToast) toast('☁️ Subiendo datos locales a la nube...');
+        await sincronizarConAppsScript();
+        if (mostrarToast) toast(`✅ ${corrales.length} corrales subidos a la nube`);
+      } else if (mostrarToast) {
+        toast('☁️ Sin datos en la nube ni local.');
+      }
     }
   } catch (e) {
     if (mostrarToast) toast('⚠️ No se pudo conectar con la nube.');
@@ -1208,15 +1213,32 @@ const showPage = (name) => {
 };
 
 // ─── Init ─────────────────────────────────────────────────────────────────
-const init = () => {
+const init = async () => {
   cargar();
   revisarCambios();
+
+  // Sincronizar con la nube al iniciar: descarga si hay datos, o sube los locales si está vacía
+  if (telegramCfg.gasUrl) {
+    try {
+      const res = await fetch(telegramCfg.gasUrl);
+      const data = await res.json();
+      if (data && data.ok && Array.isArray(data.corrales)) {
+        if (data.corrales.length > 0) {
+          corrales = data.corrales;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(corrales));
+          revisarCambios();
+        } else if (corrales.length > 0) {
+          await sincronizarConAppsScript();
+        }
+      }
+    } catch (e) {
+      console.warn('Error en sincronización inicial:', e);
+    }
+  }
+
   guardar();
   render();
   pedirPermiso();
-
-  // Cargar datos desde la nube al iniciar (si hay URL configurada)
-  cargarDesdeAppsScript(false);
 
   // Navegación
   document.querySelectorAll('.nav-item').forEach(item => {
