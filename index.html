@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0c12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Feedlot">
+  <meta name="description" content="Recordatorio de cambios de dieta para feedlot. Gestiona las etapas de adaptación de cada corral.">
+  <title>Feedlot — Dietas</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════════════ TOP BAR ═══════════════════════ -->
+  <header class="topbar">
+    <div class="topbar-title">
+      <span class="emoji">🐄</span>
+      Feedlot Dietas
+    </div>
+    <div class="topbar-actions">
+      <button class="icon-btn" title="Configuración Telegram" onclick="abrirModalConfig()">⚙️</button>
+      <button class="icon-btn" title="Notificaciones" onclick="showPage('avisos'); render()">🔔</button>
+    </div>
+  </header>
+
+  <!-- ═══════════════════════ PAGES ═══════════════════════════ -->
+
+  <!-- ── DASHBOARD ───────────────────────────────────────────── -->
+  <section class="page active" id="page-dashboard">
+
+    <div class="stat-simple">
+      <span class="stat-simple-num" id="stat-activos">0</span>
+      <span class="stat-simple-label">en adaptación</span>
+    </div>
+
+    <!-- Calendario de cambios del mes -->
+    <div id="cal-container"></div>
+
+    <div class="section-header">
+      <span class="section-title">Corrales</span>
+    </div>
+
+    <div id="lista-corrales"></div>
+
+  </section>
+
+  <!-- ── DETALLE ──────────────────────────────────────────────── -->
+  <section class="page" id="page-detalle">
+    <div id="detalle-content"></div>
+  </section>
+
+  <!-- ── REGISTRAR ────────────────────────────────────────────── -->
+  <section class="page" id="page-registrar">
+
+    <p class="reg-hint" style="margin-top:4px">
+      Tocá el corral que <strong>ingresó hoy</strong>
+    </p>
+
+    <!-- Corrales con nombre -->
+    <div class="section-header">
+      <span class="section-title">Corrales con nombre</span>
+    </div>
+    <div class="named-grid" id="grid-nominales"></div>
+
+    <!-- Corrales numéricos 1-22 -->
+    <div class="section-header">
+      <span class="section-title">Corrales numéricos</span>
+    </div>
+    <div class="corral-grid" id="grid-numericos"></div>
+
+    <!-- Texto libre -->
+    <div class="text-area-wrap">
+      <div class="text-area-label">¿Corral fuera de rango o error de tipeo? Escribilo:</div>
+      <input
+        type="text"
+        id="input-texto-libre"
+        class="text-input-free"
+        placeholder='Ej: "ingreso corral 7", "A2 hoy", "corral B"'
+        autocomplete="off"
+        autocorrect="off"
+        spellcheck="false"
+      >
+      <button class="btn btn-primary" style="margin-top:10px" onclick="procesarTextoLibre()">
+        📋 Registrar ingreso
+      </button>
+    </div>
+
+  </section>
+
+  <!-- ── AVISOS ────────────────────────────────────────────────── -->
+  <section class="page" id="page-avisos">
+    <div class="section-header" style="margin-top:4px">
+      <span class="section-title">Avisos</span>
+      <span class="section-count" id="count-avisos">Hoy</span>
+    </div>
+    <div id="lista-avisos"></div>
+  </section>
+
+  <!-- ═══════════════════════ BOTTOM NAV ══════════════════════ -->
+  <nav class="bottom-nav">
+
+    <div class="nav-item active" data-page="dashboard">
+      <span class="nav-icon">🏠</span>
+      <span>Inicio</span>
+    </div>
+
+    <div class="nav-item" data-page="registrar">
+      <span class="nav-icon">➕</span>
+      <span>Registrar</span>
+    </div>
+
+    <div class="nav-item" data-page="avisos">
+      <span class="nav-icon">🔔</span>
+      <span>Avisos</span>
+      <span class="badge" id="badge-avisos" style="display:none"></span>
+    </div>
+
+  </nav>
+
+</div><!-- /#app -->
+
+<!-- ═══════════════════════ MODAL EDITAR ════════════════════ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">✏️ Editar — <span id="modal-corral-id"></span></div>
+    <input type="hidden" id="modal-id-hidden">
+
+    <div class="modal-field">
+      <label class="modal-label" for="modal-etapa">Etapa actual</label>
+      <select class="modal-select" id="modal-etapa">
+        <option value="1">Adaptación 1</option>
+        <option value="2">Adaptación 2</option>
+        <option value="3">Adaptación 3</option>
+        <option value="4">Adaptación 4</option>
+        <option value="5">Adaptación 5</option>
+        <option value="6">Terminación</option>
+      </select>
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="modal-duracion">Duración etapa (días) — vacío = variable</label>
+      <input type="number" class="modal-input" id="modal-duracion" min="1" max="30" placeholder="5">
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="modal-inicio">Fecha inicio etapa</label>
+      <input type="date" class="modal-input" id="modal-inicio">
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="modal-estado">Estado</label>
+      <select class="modal-select" id="modal-estado">
+        <option value="Activo">Activo</option>
+        <option value="Pausado">Pausado (enfermería)</option>
+        <option value="Terminacion">Terminación</option>
+      </select>
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="modal-motivo">Motivo / nota (opcional)</label>
+      <input type="text" class="modal-input" id="modal-motivo" placeholder="Ej: fusión de lotes, extensión por clima...">
+    </div>
+
+    <div class="btn-row" style="margin-top:8px">
+      <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionManual()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MODAL TELEGRAM CONFIG ════════════════ -->
+<div class="modal-overlay" id="modal-config-overlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">🤖 Configurar Bot de Telegram</div>
+    
+    <div style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.4">
+      Recibí los avisos diarios y alertas en tu celular a través de Telegram sin costo ni bloqueos.
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="cfg-bot-token">Bot Token (de @BotFather)</label>
+      <input type="text" class="modal-input" id="cfg-bot-token" placeholder="Ej: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="cfg-chat-id">Chat ID (tu ID de usuario o grupo)</label>
+      <input type="text" class="modal-input" id="cfg-chat-id" placeholder="Ej: 987654321 o -1001234567">
+    </div>
+
+    <div class="modal-field">
+      <label class="modal-label" for="cfg-gas-url">URL de Apps Script (opcional, para reporte 8:05 AM)</label>
+      <input type="text" class="modal-input" id="cfg-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
+    </div>
+
+    <div style="background:var(--bg-raised); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px; font-size:11px; color:var(--text-muted); margin-bottom:14px;">
+      💡 <strong>¿Cómo obtener estos datos?</strong><br>
+      1. En Telegram buscá <strong>@BotFather</strong> y enviá <code>/newbot</code> para crear tu bot y obtener el <em>Token</em>.<br>
+      2. Mandale cualquier mensaje a tu nuevo bot.<br>
+      3. Buscá <strong>@userinfobot</strong> en Telegram para ver tu <em>Chat ID</em> (número).
+    </div>
+
+    <div class="btn-row" style="margin-bottom:8px">
+      <button class="btn btn-warn" onclick="probarTelegram()">🧪 Probar envío</button>
+      <button class="btn btn-primary" onclick="guardarConfigTelegram()">💾 Guardar</button>
+    </div>
+    <button class="btn btn-ghost" onclick="cerrarModalConfig()">Cerrar</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════ SNACKBAR ════════════════════════ -->
+<div class="snackbar" id="snackbar"></div>
+
+<!-- ═══════════════════════ SCRIPTS ════════════════════════ -->
+<script src="app.js"></script>
+<script>
+  // Registrar Service Worker para PWA offline
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
