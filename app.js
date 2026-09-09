@@ -43,6 +43,7 @@ let restartPickerOpen = false;
 let confirmandoEliminar = false;
 let calMes  = new Date().getMonth();
 let calAnio = new Date().getFullYear();
+let deferredInstallPrompt = null;
 
 // ─── Utils de fecha ─────────────────────────────────────────────────────────
 const hoy = () => {
@@ -1278,6 +1279,32 @@ const init = () => {
   showPage('dashboard');
 };
 
+// ─── PWA Install Prompt ───────────────────────────────────────────────────
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('btn-instalar');
+  if (btn) btn.style.display = 'flex';
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  const btn = document.getElementById('btn-instalar');
+  if (btn) btn.style.display = 'none';
+  toast('✅ ¡Feedlot instalado con éxito!');
+});
+
+const instalarPWA = async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  if (outcome === 'accepted') {
+    deferredInstallPrompt = null;
+    const btn = document.getElementById('btn-instalar');
+    if (btn) btn.style.display = 'none';
+  }
+};
+
 // Exponer globales que usa el HTML inline
 Object.assign(window, {
   registrarIngreso,
@@ -1304,6 +1331,7 @@ Object.assign(window, {
   cerrarModalConfig,
   guardarConfigTelegram,
   probarTelegram,
+  instalarPWA,
   showPage,
   toast,
   navMes,
