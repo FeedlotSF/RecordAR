@@ -22,8 +22,8 @@
       Feedlot Dietas
     </div>
     <div class="topbar-actions">
+      <button class="icon-btn" id="btn-sync" title="Sincronizar con la nube" onclick="cargarDesdeAppsScript(true)">☁️</button>
       <button class="icon-btn" id="btn-instalar" title="Instalar Aplicación" style="display:none" onclick="instalarPWA()">📲</button>
-      <button class="icon-btn" title="Configuración Telegram" onclick="abrirModalConfig()">⚙️</button>
       <button class="icon-btn" title="Notificaciones" onclick="showPage('avisos'); render()">🔔</button>
     </div>
   </header>
@@ -171,46 +171,6 @@
       <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
       <button class="btn btn-primary" onclick="guardarEdicionManual()">Guardar</button>
     </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════ MODAL TELEGRAM CONFIG ════════════════ -->
-<div class="modal-overlay" id="modal-config-overlay">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">🤖 Configurar Bot de Telegram</div>
-    
-    <div style="font-size:12px; color:var(--text-secondary); margin-bottom:14px; line-height:1.4">
-      Recibí los avisos diarios y alertas en tu celular a través de Telegram sin costo ni bloqueos.
-    </div>
-
-    <div class="modal-field">
-      <label class="modal-label" for="cfg-bot-token">Bot Token (de @BotFather)</label>
-      <input type="text" class="modal-input" id="cfg-bot-token" placeholder="Ej: 123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ">
-    </div>
-
-    <div class="modal-field">
-      <label class="modal-label" for="cfg-chat-id">Chat ID (tu ID de usuario o grupo)</label>
-      <input type="text" class="modal-input" id="cfg-chat-id" placeholder="Ej: 987654321 o -1001234567">
-    </div>
-
-    <div class="modal-field">
-      <label class="modal-label" for="cfg-gas-url">URL de Apps Script (opcional, para reporte 8:05 AM)</label>
-      <input type="text" class="modal-input" id="cfg-gas-url" placeholder="https://script.google.com/macros/s/.../exec">
-    </div>
-
-    <div style="background:var(--bg-raised); border:1px solid var(--border); border-radius:var(--radius-md); padding:10px; font-size:11px; color:var(--text-muted); margin-bottom:14px;">
-      💡 <strong>¿Cómo obtener estos datos?</strong><br>
-      1. En Telegram buscá <strong>@BotFather</strong> y enviá <code>/newbot</code> para crear tu bot y obtener el <em>Token</em>.<br>
-      2. Mandale cualquier mensaje a tu nuevo bot.<br>
-      3. Buscá <strong>@userinfobot</strong> en Telegram para ver tu <em>Chat ID</em> (número).
-    </div>
-
-    <div class="btn-row" style="margin-bottom:8px">
-      <button class="btn btn-warn" onclick="probarTelegram()">🧪 Probar envío</button>
-      <button class="btn btn-primary" onclick="guardarConfigTelegram()">💾 Guardar</button>
-    </div>
-    <button class="btn btn-ghost" onclick="cerrarModalConfig()">Cerrar</button>
   </div>
 </div>
 

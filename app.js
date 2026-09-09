@@ -31,6 +31,7 @@ const TOTAL_ETAPAS     = 5;
 const STORAGE_KEY      = 'feedlot_corrales_v2';
 const AVISOS_KEY       = 'feedlot_avisos_v2';
 const TELEGRAM_CFG_KEY = 'feedlot_telegram_cfg';
+const GAS_URL_DEFAULT  = 'https://script.google.com/macros/s/AKfycbwV88P9TSpRoja-b-MA7qSFvCRydHiQYILwMxf-LH8Yzvl3cJjkg0Js4m8CYDBzTZy6/exec';
 
 // ─── State ─────────────────────────────────────────────────────────────────
 let corrales  = [];   // array de objetos corral
@@ -102,11 +103,11 @@ const cargar = () => {
     const t = localStorage.getItem(TELEGRAM_CFG_KEY);
     corrales = c ? JSON.parse(c) : [];
     avisos   = a ? JSON.parse(a) : [];
-    telegramCfg = t ? JSON.parse(t) : { botToken: '', chatId: '' };
+    telegramCfg = t ? JSON.parse(t) : { botToken: '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U', chatId: '1891231041', gasUrl: GAS_URL_DEFAULT };
   } catch {
     corrales = [];
     avisos = [];
-    telegramCfg = { botToken: '', chatId: '' };
+    telegramCfg = { botToken: '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U', chatId: '1891231041', gasUrl: GAS_URL_DEFAULT };
   }
 };
 
@@ -415,23 +416,12 @@ const enviarTelegram = async (mensaje) => {
       })
     });
     const data = await res.json();
-    return data.ok;
-  } catch (err) {
-    console.warn('Error enviando Telegram:', err);
-    return false;
-  }
-};
-
-const abrirModalConfig = () => {
-  document.getElementById('cfg-bot-token').value = telegramCfg.botToken || '';
-  document.getElementById('cfg-chat-id').value   = telegramCfg.chatId || '';
-  document.getElementById('cfg-gas-url').value   = telegramCfg.gasUrl || '';
-  document.getElementById('modal-config-overlay').classList.add('open');
-};
-
-const cerrarModalConfig = () => {
-  document.getElementById('modal-config-overlay').classList.remove('open');
-};
+return data.ok;
+    } catch (err) {
+      console.warn('Error enviando Telegram:', err);
+      return false;
+    }
+  };
 
 const sincronizarConAppsScript = async () => {
   if (!telegramCfg.gasUrl) return;
@@ -447,51 +437,24 @@ const sincronizarConAppsScript = async () => {
   }
 };
 
-const guardarConfigTelegram = () => {
-  const botToken = document.getElementById('cfg-bot-token').value.trim();
-  const chatId   = document.getElementById('cfg-chat-id').value.trim();
-  const gasUrl   = document.getElementById('cfg-gas-url').value.trim();
-  telegramCfg = { botToken, chatId, gasUrl };
-  guardar();
-  if (gasUrl) {
-    sincronizarConAppsScript();
-    toast('💾 Configuración y sincronización con Google guardada');
-  } else {
-    toast('💾 Configuración de Telegram guardada');
-  }
-  cerrarModalConfig();
-};
-
-const probarTelegram = async () => {
-  const botToken = document.getElementById('cfg-bot-token').value.trim();
-  const chatId   = document.getElementById('cfg-chat-id').value.trim();
-  if (!botToken || !chatId) {
-    toast('⚠️ Completá el Token y el Chat ID primero');
-    return;
-  }
-  toast('📤 Enviando mensaje de prueba...');
-  const testCfg = { botToken, chatId };
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+const cargarDesdeAppsScript = async (mostrarToast = false) => {
+  if (!telegramCfg.gasUrl) return;
+  if (mostrarToast) toast('☁️ Sincronizando con la nube...');
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: `🐄 <b>Feedlot Dietas</b>\n\n✅ <i>¡Conexión exitosa con Telegram!</i>\nRecibirás las alertas de cambios de dieta por acá.`,
-        parse_mode: 'HTML'
-      })
-    });
+    const res = await fetch(telegramCfg.gasUrl);
     const data = await res.json();
-    if (data.ok) {
-      telegramCfg = testCfg;
-      guardar();
-      toast('✅ ¡Mensaje recibido en Telegram!');
-    } else {
-      toast(`❌ Error Telegram: ${data.description || 'Token o ID inválido'}`);
+    if (data && data.ok && Array.isArray(data.corrales) && data.corrales.length > 0) {
+      corrales = data.corrales;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(corrales));
+      revisarCambios();
+      render();
+      if (mostrarToast) toast(`✅ Sincronizado: ${corrales.length} corrales actualizados`);
+    } else if (mostrarToast) {
+      toast('☁️ La nube no tiene corrales registrados aún.');
     }
   } catch (e) {
-    toast('❌ Error de conexión al enviar');
+    if (mostrarToast) toast('⚠️ No se pudo conectar con la nube.');
+    console.warn('Error cargando desde Apps Script:', e);
   }
 };
 
@@ -1252,6 +1215,9 @@ const init = () => {
   render();
   pedirPermiso();
 
+  // Cargar datos desde la nube al iniciar (si hay URL configurada)
+  cargarDesdeAppsScript(false);
+
   // Navegación
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -1327,10 +1293,6 @@ Object.assign(window, {
   abrirModalEditar,
   cerrarModal,
   guardarEdicionManual,
-  abrirModalConfig,
-  cerrarModalConfig,
-  guardarConfigTelegram,
-  probarTelegram,
   instalarPWA,
   showPage,
   toast,
