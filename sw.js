@@ -1,5 +1,5 @@
 // Service Worker — Feedlot Dietas PWA
-const CACHE_NAME = 'feedlot-v2';
+const CACHE_NAME = 'feedlot-v3';
 const ASSETS = [
   './',
   './index.html',

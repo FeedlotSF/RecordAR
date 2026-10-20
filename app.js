@@ -103,12 +103,24 @@ const cargar = () => {
     const t = localStorage.getItem(TELEGRAM_CFG_KEY);
     corrales = c ? JSON.parse(c) : [];
     avisos   = a ? JSON.parse(a) : [];
-    telegramCfg = t ? JSON.parse(t) : { botToken: '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U', chatId: '1891231041', gasUrl: GAS_URL_DEFAULT };
+    const parsedT = t ? JSON.parse(t) : {};
+    telegramCfg = {
+      botToken: parsedT.botToken || '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U',
+      chatId:   parsedT.chatId   || '1891231041',
+      gasUrl:   parsedT.gasUrl   || GAS_URL_DEFAULT
+    };
   } catch {
     corrales = [];
     avisos = [];
-    telegramCfg = { botToken: '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U', chatId: '1891231041', gasUrl: GAS_URL_DEFAULT };
+    telegramCfg = {
+      botToken: '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U',
+      chatId:   '1891231041',
+      gasUrl:   GAS_URL_DEFAULT
+    };
   }
+  if (!telegramCfg.gasUrl) telegramCfg.gasUrl = GAS_URL_DEFAULT;
+  if (!telegramCfg.botToken) telegramCfg.botToken = '8925363013:AAHYK15KNV-5RVrlcgUaqxkrZISU0e7Wc1U';
+  if (!telegramCfg.chatId) telegramCfg.chatId = '1891231041';
 };
 
 // ─── Modelo de corral ─────────────────────────────────────────────────────
@@ -445,13 +457,19 @@ const cargarDesdeAppsScript = async (mostrarToast = false) => {
       const cb = 'jpcb_' + Date.now();
       const s = document.createElement('script');
       const t = setTimeout(() => {
-        document.body.removeChild(s);
+        if (s.parentNode) s.parentNode.removeChild(s);
         delete window[cb];
         reject(new Error('timeout'));
-      }, 15000);
+      }, 10000);
+      s.onerror = () => {
+        clearTimeout(t);
+        if (s.parentNode) s.parentNode.removeChild(s);
+        delete window[cb];
+        reject(new Error('error de red'));
+      };
       window[cb] = (d) => {
         clearTimeout(t);
-        document.body.removeChild(s);
+        if (s.parentNode) s.parentNode.removeChild(s);
         delete window[cb];
         resolve(d);
       };
@@ -1232,46 +1250,9 @@ const showPage = (name) => {
 };
 
 // ─── Init ─────────────────────────────────────────────────────────────────
-const init = async () => {
+const init = () => {
   cargar();
   revisarCambios();
-
-  // Sincronizar con la nube al iniciar (JSONP para evitar CORS)
-  if (telegramCfg.gasUrl) {
-    try {
-      const data = await new Promise((resolve, reject) => {
-        const cb = 'jpcb_' + Date.now();
-        const s = document.createElement('script');
-        const t = setTimeout(() => {
-          document.body.removeChild(s);
-          delete window[cb];
-          reject(new Error('timeout'));
-        }, 15000);
-        window[cb] = (d) => {
-          clearTimeout(t);
-          document.body.removeChild(s);
-          delete window[cb];
-          resolve(d);
-        };
-        const sep = telegramCfg.gasUrl.includes('?') ? '&' : '?';
-        s.src = telegramCfg.gasUrl + sep + 'callback=' + cb;
-        document.body.appendChild(s);
-      });
-      if (data && data.ok && Array.isArray(data.corrales)) {
-        if (data.corrales.length > 0) {
-          corrales = data.corrales;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(corrales));
-          revisarCambios();
-        } else if (corrales.length > 0) {
-          await sincronizarConAppsScript();
-        }
-      }
-    } catch (e) {
-      console.warn('Error en sincronización inicial:', e);
-    }
-  }
-
-  guardar();
   render();
   pedirPermiso();
 
@@ -1300,6 +1281,9 @@ const init = async () => {
   });
 
   showPage('dashboard');
+
+  // Sincronizar en segundo plano con la nube
+  cargarDesdeAppsScript(false);
 };
 
 // ─── PWA Install Prompt ───────────────────────────────────────────────────
