@@ -438,14 +438,25 @@ return data.ok;
 const sincronizarConAppsScript = async () => {
   if (!telegramCfg.gasUrl || corrales.length === 0) return;
   try {
-    await fetch(telegramCfg.gasUrl, {
+    // Usamos fetch con cors (el GAS está publicado como "cualquier persona")
+    const res = await fetch(telegramCfg.gasUrl, {
       method: 'POST',
-      mode: 'no-cors',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
       body: JSON.stringify({ corrales })
     });
+    if (!res.ok) console.warn('GAS POST respondió con status', res.status);
   } catch (e) {
-    console.warn('Error sincronizando con Apps Script:', e);
+    // Si cors falla (ej. red), intentar no-cors como fallback silencioso
+    try {
+      await fetch(telegramCfg.gasUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({ corrales })
+      });
+    } catch (e2) {
+      console.warn('Error sincronizando con Apps Script:', e2);
+    }
   }
 };
 
@@ -453,38 +464,42 @@ const cargarDesdeAppsScript = async (mostrarToast = false) => {
   if (!telegramCfg.gasUrl) return;
   if (mostrarToast) toast('☁️ Sincronizando con la nube...');
   try {
-    const data = await new Promise((resolve, reject) => {
-      const cb = 'jpcb_' + Date.now();
-      const s = document.createElement('script');
-      const t = setTimeout(() => {
-        if (s.parentNode) s.parentNode.removeChild(s);
-        delete window[cb];
-        reject(new Error('timeout'));
-      }, 10000);
-      s.onerror = () => {
-        clearTimeout(t);
-        if (s.parentNode) s.parentNode.removeChild(s);
-        delete window[cb];
-        reject(new Error('error de red'));
-      };
-      window[cb] = (d) => {
-        clearTimeout(t);
-        if (s.parentNode) s.parentNode.removeChild(s);
-        delete window[cb];
-        resolve(d);
-      };
-      const sep = telegramCfg.gasUrl.includes('?') ? '&' : '?';
-      s.src = telegramCfg.gasUrl + sep + 'callback=' + cb;
-      document.body.appendChild(s);
+    // Usamos fetch directo (el GAS devuelve JSON puro, NO soporta JSONP)
+    const res = await fetch(telegramCfg.gasUrl, {
+      method: 'GET',
+      cache: 'no-store'
     });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
     if (data && data.ok && Array.isArray(data.corrales)) {
       if (data.corrales.length > 0) {
-        corrales = data.corrales;
+        // La nube tiene datos: mergear inteligentemente
+        // Ganador = quien tiene el historial más reciente para cada corral
+        const nubeMap = new Map(data.corrales.map(c => [c.id, c]));
+        const localMap = new Map(corrales.map(c => [c.id, c]));
+        const mergeado = [];
+        // Unir todas las IDs
+        const todasIds = new Set([...nubeMap.keys(), ...localMap.keys()]);
+        todasIds.forEach(id => {
+          const nube  = nubeMap.get(id);
+          const local = localMap.get(id);
+          if (!local) { mergeado.push(nube); return; }
+          if (!nube)  { mergeado.push(local); return; }
+          // Comparar timestamp del primer historial (más reciente)
+          const tsNube  = nube.historial?.[0]?.ts  ?? 0;
+          const tsLocal = local.historial?.[0]?.ts ?? 0;
+          mergeado.push(tsNube >= tsLocal ? nube : local);
+        });
+        corrales = mergeado;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(corrales));
         revisarCambios();
         render();
         if (mostrarToast) toast(`✅ Sincronizado: ${corrales.length} corrales`);
+        // Subir el resultado mergeado a la nube
+        await sincronizarConAppsScript();
       } else if (corrales.length > 0) {
+        // Nube vacía pero local tiene datos → subir
         if (mostrarToast) toast('☁️ Subiendo datos locales a la nube...');
         await sincronizarConAppsScript();
         if (mostrarToast) toast(`✅ ${corrales.length} corrales subidos a la nube`);
@@ -495,7 +510,7 @@ const cargarDesdeAppsScript = async (mostrarToast = false) => {
       toast('⚠️ Error al leer datos de la nube.');
     }
   } catch (e) {
-    if (mostrarToast) toast('⚠️ No se pudo conectar con la nube. Verificá que el script esté desplegado como "Cualquier persona, incluso anónimo".');
+    if (mostrarToast) toast('⚠️ No se pudo conectar con la nube.');
     console.warn('Error cargando desde Apps Script:', e);
   }
 };
